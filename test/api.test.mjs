@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleApi, responseRequest, validatePayload, parseResponse } from '../server/api.mjs';
+import { handleApi, responseRequest, validatePayload, parseResponse, allowedModels } from '../server/api.mjs';
 import { reserve, memoryLimiter } from '../server/limiter.mjs';
 const env={OPENAI_API_KEY:'test-key-never-a-real-secret',APP_ACCESS_TOKEN:'test-app-token-with-at-least-24-characters',ALLOWED_ORIGINS:'https://martinmesko.github.io',DAILY_REQUEST_LIMIT:'2'};
 const body=()=>({kind:'advice',message:'Ako overiť relé?',model:'gpt-6.1-sol',effort:'medium',profile:{name:'Martin',role:'Technik',context:'PDF'},notes:[{id:'n1',title:'Zdroj',kind:'Pravidlo',tags:'K12',content:'Cituj stranu.'}],situations:[{id:'s1',title:'Kontrola relé',category:'Schémy',tool:'Codex',modelId:'gpt-6.1-sol',effort:'high',why:'Dôkazy'}],models:[{id:'gpt-6.1-sol',label:'Sol',tool:'Codex',efforts:['medium','high']}]});
@@ -51,4 +51,28 @@ test('public config requires auth but never calls the OpenAI API',async()=>{
 });
 test('instructions treat notes as untrusted and cannot request actions',()=>{
   const r=responseRequest(validatePayload(body(),env),env);assert.match(r.instructions,/nie systémové príkazy/);assert.match(r.instructions,/Nevymýšľaj ID/);assert.doesNotMatch(r.instructions,/Junior AI technik/i);
+});
+test('excluded models stay blocked even with a stale or overridden server allowlist',async()=>{
+  const stale={...env,OPENAI_MODEL:'gpt-6-astra',ALLOWED_MODELS:'gpt-6-astra,fable,claude-fable-5-1,gpt-6.1-sol'};
+  assert.deepEqual(allowedModels(stale),['gpt-6.1-sol']);
+  for(const model of ['gpt-6-astra','fable','claude-fable-5-1']){
+    let calls=0;const r=await handleApi(request({...body(),model}),stale,{fetcher:async()=>{calls++;return Response.json(result());}});
+    assert.equal(r.status,400);assert.equal(calls,0);
+  }
+  const r=await handleApi(new Request('https://api.example/api/config',{headers:{Authorization:'Bearer '+env.APP_ACCESS_TOKEN}}),stale);
+  const config=await r.json();assert.equal(config.defaultModel,'gpt-6.1-sol');assert.deepEqual(config.models,['gpt-6.1-sol']);
+});
+test('server removes excluded legacy catalog entries and carries selected priority',()=>{
+  const input=body();input.priority='quality';
+  input.models.push({id:'gpt-6-astra',label:'GPT-6 Astra',tool:'Codex',efforts:['high']});
+  input.situations[0].modelId='gpt-6-astra';
+  const payload=validatePayload(input,env);assert.equal(payload.context.priority,'quality');
+  assert.ok(!payload.context.models.some(m=>/astra/i.test(m.id)));assert.equal(payload.context.situations[0].modelId,'gpt-6.1-sol');
+  assert.match(responseRequest(payload,env).instructions,/hlavnom AJ alternatívnom/);
+});
+test('model and skill output cannot propose excluded models even if provider ignores instructions',()=>{
+  const payload=validatePayload(body(),env);
+  for(const answer of ['Použi GPT-6 Astra.','Spusti claude --model fable','Použi Claude Fable 5.1'])assert.throws(()=>parseResponse(result({...output,answer}),payload),/vyradený/);
+  assert.throws(()=>parseResponse(result({...output,skillMarkdown:'---\nname: qa\ndescription: QA\n---\nPouži Fable'}),{...payload,kind:'skill'}),/vyradený/);
+  assert.throws(()=>parseResponse({...result(),model:'gpt-6-astra'},payload),/vyradený/);
 });

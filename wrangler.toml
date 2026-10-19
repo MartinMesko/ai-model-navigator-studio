@@ -4,7 +4,7 @@ compatibility_date = "2026-10-19"
 
 [vars]
 OPENAI_MODEL = "gpt-6.1-sol"
-ALLOWED_MODELS = "gpt-6-luna,gpt-5.6-terra,gpt-6.1-sol,gpt-6-astra"
+ALLOWED_MODELS = "gpt-6-luna,gpt-5.6-terra,gpt-6.1-sol"
 ALLOWED_ORIGINS = "https://martinmesko.github.io"
 DAILY_REQUEST_LIMIT = "30"
 MAX_OUTPUT_TOKENS = "4000"

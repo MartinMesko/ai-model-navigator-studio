@@ -1,10 +1,11 @@
-import { initialState, CATEGORIES, EFFORTS, SESSIONS, SOURCES, VERIFIED_ON } from './data.mjs?v=2.1';
-import { id, escapeHtml as h, rankSituations, recommend, cliCommand, selectNotes, localSkill, validateBackup, hasSecret } from './core.mjs?v=2.1';
+import { initialState, CATEGORIES, EFFORTS, SESSIONS, SOURCES, VERIFIED_ON } from './data.mjs?v=2.2';
+import { id, escapeHtml as h, rankSituations, recommend, cliCommand, selectNotes, localSkill, validateBackup, hasSecret, applyModelPolicy, hasExcludedModel, modelTool, usableModel } from './core.mjs?v=2.2';
+import { MODEL_POLICY_MESSAGE, hasExcludedRecommendation } from './policy.mjs?v=2.2';
 
 const STORAGE = 'navigator-studio-v2';
-let state = initialState();
+let state = applyModelPolicy(initialState());
 let storageWarning = '';
-try { const saved = localStorage.getItem(STORAGE); if (saved) state = validateBackup(JSON.parse(saved)); } catch { storageWarning = 'Uložené dáta sa nepodarilo načítať. Pred ďalšou prácou si skontroluj alebo importuj zálohu.'; }
+try { const saved = localStorage.getItem(STORAGE); if (saved) { state = validateBackup(JSON.parse(saved)); localStorage.setItem(STORAGE, JSON.stringify(state)); } } catch { storageWarning = 'Uložené dáta sa nepodarilo načítať alebo uložiť. Pred ďalšou prácou si skontroluj alebo importuj zálohu.'; }
 const $ = selector => document.querySelector(selector);
 const routeNames = { navigator: 'Navigátor', notes: 'Poznatky', assistant: 'AI asistent', skills: 'Skills dielňa', models: 'Modely & effort', settings: 'Nastavenia' };
 let route = routeNames[location.hash.slice(1)] ? location.hash.slice(1) : 'navigator';
@@ -49,6 +50,7 @@ const heading = (title, subtitle, actions = '') => route === 'navigator'
   ? `<section class="command-hero" aria-labelledby="heroTitle"><div class="hero-copy"><div class="eyebrow"><span class="hero-signal" aria-hidden="true"></span> OSOBNÝ RIADIACI PRIESTOR <span class="hero-index">/ 001</span></div><h1 id="heroTitle">NAVIGATOR<span>STUDIO</span></h1><p class="hero-caption">${title}</p><p class="hero-description">${subtitle}</p><div class="hero-actions">${actions}<span class="hero-mode">PRAVIDLÁ <i>·</i> POZNATKY <i>·</i> AI</span></div></div><div class="signal-portal" aria-hidden="true"><div class="portal-grid"></div><div class="portal-ring"></div><div class="portal-core">N<span>STUDIO</span></div><span class="portal-cross top">+</span><span class="portal-cross bottom">+</span><span class="portal-readout">04 SESSIONS / JEDEN WORKSPACE</span></div></section>`
   : `<div class="page-heading"><div><div class="eyebrow">MARTINOV AI WORKSPACE</div><h1>${title}</h1><p>${subtitle}</p></div><div class="heading-actions">${actions}</div></div>`;
 function save() {
+  state = applyModelPolicy(state);
   try { localStorage.setItem(STORAGE, JSON.stringify(state)); storageWarning = ''; }
   catch { storageWarning = 'Prehliadač nedokázal uložiť dáta. Urob export zálohy; aktuálne zmeny ostávajú iba v pamäti tejto karty.'; toast(storageWarning); }
 }
@@ -62,19 +64,42 @@ function renderNav() {
   $('#connectionBadge').innerHTML = `<span class="live-dot ${connected ? '' : 'offline'}"></span><span>${connected ? 'AI pripravená' : 'AI nepripojená'}</span>`;
 }
 function stats() {
-  const items = [['layers',state.situations.length,'pracovných situácií'],['book',state.notes.length,'tvojich poznatkov'],['code',state.skills.length,'uložených skills'],['bolt',state.models.filter(m => m.enabled).length,'aktívnych modelov']];
+  const items = [['layers',state.situations.length,'pracovných situácií'],['book',state.notes.length,'tvojich poznatkov'],['code',state.skills.length,'uložených skills'],['bolt',state.models.filter(usableModel).length,'aktívnych modelov']];
   return `<div class="stats">${items.map(([i,n,t]) => `<div class="stat"><div class="stat-icon">${icon(i)}</div><div><div class="stat-value">${n.toString().padStart(2,'0')}</div><div class="stat-label">${t}</div></div></div>`).join('')}</div>`;
+}
+function commandHTML(choice, situationId, kind = 'main') {
+  const command = cliCommand(choice?.model, choice?.effort);
+  if (!command) return '<p class="tiny block-gap">Bez dostupného povoleného modelu a podporovaného effort sa príkaz nevygeneruje.</p>';
+  const label = kind === 'main' ? 'Skopírovať CLI príkaz' : 'Skopírovať alternatívny CLI príkaz';
+  return `<div class="code-block"><div class="code-header">TERMINÁL · ${h(choice.model.tool)}<button class="icon-button" data-action="copy-command" data-id="${h(situationId)}" data-choice="${kind}" aria-label="${label}">${icon('copy')}</button></div><pre>${h(command.launch)}${choice.model.tool === 'Codex' ? '\n# /reasoning → ' + h(choice.effort) : ''}</pre></div><p class="tiny">${h(command.note)}</p>`;
 }
 function recommendationHTML() {
   const s = state.situations.find(s => s.id === selectedId);
   if (!s) return empty('Vyber pracovnú situáciu', 'Klikni na riadok tabuľky a pozri nastavenie pre svoju úlohu.');
-  const r = recommend(s, state.models, state.settings.priority), command = cliCommand(r.model, r.effort), alt = modelOf(s.alternative), session = SESSIONS.find(a => a.id === s.session);
-  const secondary = s.secondaryModelId ? cliCommand(modelOf(s.secondaryModelId), r.effort) : null;
-  return `<div class="recommend-label">${icon('compass')} PRAVIDLOVÉ ODPORÚČANIE</div><h2>${h(s.title)}</h2><p class="rec-category">${h(s.category)} · ${h(session?.name || '')}</p><dl class="recommend-facts"><div><dt>Nástroj</dt><dd>${toolPill(s.tool)}</dd></div><div><dt>Model</dt><dd>${h(r.model?.label?.split(' · ')[0] || s.modelId)}</dd></div><div><dt>Effort</dt><dd>${effortPill(r.effort)}</dd></div></dl><p class="why">${h(s.why)}</p>${r.adjusted ? '<p class="tiny">Nastavenie upravené podľa tvojej priority.</p>' : ''}<div class="alternative">ALTERNATÍVA<strong>${h(alt?.tool || '')} · ${h(displayModel(s.alternative))}${alt && !alt.enabled ? ' · vypnutý model' : ''}</strong></div>${r.unavailable ? '<div class="info-line warn">Model je v katalógu vypnutý alebo chýba. Uprav situáciu alebo dostupnosť modelu.</div>' : `<div class="code-block"><div class="code-header">TERMINÁL · ${h(r.model.tool)}<button class="icon-button" data-action="copy-command" data-id="${h(s.id)}" aria-label="Skopírovať CLI príkaz">${icon('copy')}</button></div><pre>${h(command?.launch || 'Model nemá platný CLI identifikátor.')}${command && r.model.tool === 'Codex' ? '\n# /reasoning → ' + h(r.effort) : ''}</pre></div>${command ? `<p class="tiny">${h(command.note)}</p>` : ''}`}${secondary ? `<div class="code-block"><div class="code-header">DRUHÝ NEZÁVISLÝ AGENT</div><pre>${h(secondary.launch)}</pre></div>` : ''}${s.deterministic ? `<div class="info-line">${icon('search')}Najprv použi textový index alebo pdftotext a presné označenie. Model vyberá postup.</div>` : ''}${s.humanRequired ? `<div class="info-line warn">${icon('shield')}Konečné posúdenie a schválenie patrí kvalifikovanému človeku.</div>` : ''}<div style="display:flex;gap:8px;margin-top:17px">${button(icon('edit')+' Upraviť','edit-situation','small',`data-id="${h(s.id)}"`)}${button('Opýtať sa AI '+icon('arrow'),'ask-situation','primary small',`data-id="${h(s.id)}"`)}</div>`;
+  const r = recommend(s, state.models, state.settings.priority), session = SESSIONS.find(a => a.id === s.session);
+  const other = r.secondary || r.alternative;
+  const otherTitle = r.secondary ? 'DRUHÝ NEZÁVISLÝ AGENT' : other.tool === r.tool ? 'ALTERNATÍVA V ROVNAKOM NÁSTROJI' : 'ALTERNATÍVNY NÁSTROJ';
+  return `<div class="recommend-label">${icon('compass')} PRAVIDLOVÉ ODPORÚČANIE</div>
+    <h2>${h(s.title)}</h2><p class="rec-category">${h(s.category)} · ${h(session?.name || '')}</p>
+    <dl class="recommend-facts"><div><dt>Nástroj</dt><dd>${toolPill(r.workflowTool)}</dd></div><div><dt>Model</dt><dd>${h(r.model?.label?.split(' · ')[0] || 'Nedostupný')}</dd></div><div><dt>Effort</dt><dd>${effortPill(r.effort)}</dd></div></dl>
+    <p class="why">${h(s.why)}</p><p class="choice-reason">${h(r.reason)}</p>
+    ${commandHTML(r, s.id)}
+    <section class="alternative" aria-label="Alternatívne nastavenie"><div class="choice-label">${otherTitle}</div>
+      ${other.model ? `<strong>${h(other.model.tool)} · ${h(other.model.label.split(' · ')[0])}</strong><div class="choice-effort">Effort ${effortPill(other.effort)}</div>` : '<strong>Nie je dostupná povolená alternatíva.</strong>'}
+      <p class="choice-reason">${h(other.reason)}</p>
+      <p class="tiny">${r.secondary ? 'Súčasť dvojagentového workflow.' : other.tool === r.tool ? 'Odlišný model pre ten istý nástroj; vyberáš jednu z možností.' : 'Iný nástroj pre tú istú úlohu; používa vlastný CLI príkaz.'} Rovnaká priorita ako hlavná voľba.</p>
+      ${commandHTML(other, s.id, r.secondary ? 'secondary' : 'alternative')}
+    </section>
+    ${s.deterministic ? `<div class="info-line">${icon('search')}Najprv použi textový index alebo pdftotext a presné označenie. Model vyberá postup.</div>` : ''}
+    ${s.humanRequired ? `<div class="info-line warn">${icon('shield')}Konečné posúdenie a schválenie patrí kvalifikovanému človeku.</div>` : ''}
+    <div style="display:flex;gap:8px;margin-top:17px">${button(icon('edit')+' Upraviť','edit-situation','small',`data-id="${h(s.id)}"`)}${button('Opýtať sa AI '+icon('arrow'),'ask-situation','primary small',`data-id="${h(s.id)}"`)}</div>`;
 }
 function tableHTML() {
   const rows = rankSituations(state.situations, query, category);
-  return `<table class="situation-table"><thead><tr><th>SITUÁCIA V PRÁCI</th><th>NÁSTROJ</th><th>MODEL</th><th>EFFORT</th><th><span class="tiny">EDIT</span></th></tr></thead><tbody>${rows.map(s => `<tr tabindex="0" data-select="${h(s.id)}" class="${selectedId === s.id ? 'selected' : ''}" aria-label="${h(s.title)}"><td class="task-cell"><strong>${h(s.title)}</strong><small>${h(s.category)}${s.updatedAt !== VERIFIED_ON ? ' · vlastná úprava' : ''}</small></td><td>${toolPill(s.tool)}</td><td class="model-label">${h(displayModel(s.modelId))}</td><td>${effortPill(s.effort)}</td><td><button type="button" class="icon-button" data-action="edit-situation" data-id="${h(s.id)}" aria-label="Upraviť: ${h(s.title)}">${icon('edit')}</button></td></tr>`).join('') || '<tr><td colspan="5">Žiadna zhoda. Skús iné slová alebo pridaj vlastnú situáciu.</td></tr>'}</tbody></table>`;
+  return `<table class="situation-table"><thead><tr><th>SITUÁCIA V PRÁCI</th><th>NÁSTROJ</th><th>MODEL</th><th>EFFORT</th><th><span class="tiny">EDIT</span></th></tr></thead><tbody>${rows.map(s => {
+    const r = recommend(s, state.models, state.settings.priority);
+    return `<tr tabindex="0" data-select="${h(s.id)}" class="${selectedId === s.id ? 'selected' : ''}" aria-label="${h(s.title)}"><td class="task-cell"><strong>${h(s.title)}</strong><small>${h(s.category)}${s.updatedAt !== VERIFIED_ON ? ' · vlastná úprava' : ''}</small></td><td>${toolPill(r.workflowTool)}</td><td class="model-label">${h(r.model?.label.split(' · ')[0] || 'Nedostupný')}</td><td>${effortPill(r.effort)}</td><td><button type="button" class="icon-button" data-action="edit-situation" data-id="${h(s.id)}" aria-label="Upraviť: ${h(s.title)}">${icon('edit')}</button></td></tr>`;
+  }).join('') || '<tr><td colspan="5">Žiadna zhoda. Skús iné slová alebo pridaj vlastnú situáciu.</td></tr>'}</tbody></table>`;
 }
 function navigatorPage() {
   const s = state.situations.find(s => s.id === selectedId);
@@ -99,7 +124,11 @@ function skillsPage() {
 }
 function skillResultHTML() { return `<div class="block-gap"><h3>Text skillu · môžeš ho upraviť</h3><textarea id="generatedSkill" class="skill-preview block-gap" aria-label="Obsah vytvoreného skillu">${h(generatedSkill)}</textarea><div class="form-actions">${button('Stiahnuť SKILL.md','download-generated','small')}${button('Uložiť do knižnice','save-generated','primary small')}</div></div>`; }
 function modelsPage() {
-  return `${heading('Modely pod tvojou kontrolou.', 'Oficiálne doložený názov neznamená automatický prístup v tvojom účte.',button(icon('plus')+' Vlastný model','new-model','primary'))}<div class="info-line" style="margin-bottom:22px">${icon('info')}Overenie ${dateLabel(VERIFIED_ON)}: Claude Code uvádza aj Opus 5.5, Sonnet 5.5, Haiku 5.5 a Fable 5.1. Alias v CLI môže závisieť od poskytovateľa; potvrď ho cez /model.</div><div class="model-grid">${state.models.map(m=>`<article class="panel model-card ${m.enabled?'':'disabled'}"><div class="panel-title" style="margin:0">${toolPill(m.tool)}<button class="icon-button" data-action="edit-model" data-id="${h(m.id)}" aria-label="Upraviť model ${h(m.label)}">${icon('edit')}</button></div><h3>${h(m.label.split(' · ')[0])}</h3><code>${h(m.id)}</code><p>${h(m.description)}</p><div class="effort-options">${m.efforts.map(e=>effortPill(e)).join('')}</div><div class="model-footer"><span>${m.status==='documented'?'● Doložené v dokumentácii':'○ Vlastný záznam'}</span><button class="text-link" data-action="toggle-model" data-id="${h(m.id)}">${m.enabled?'Vypnúť':'Zapnúť'}</button></div>${m.source&&/^https:\/\//.test(m.source)?`<a href="${h(m.source)}" rel="noreferrer" target="_blank">Oficiálny zdroj ↗</a>`:''}</article>`).join('')}</div><section class="panel pad block-gap"><h2>Čo znamená effort?</h2><div class="sessions">${[['low','Rýchle hľadanie a extrakcia.'],['medium','Bežná práca a menšie skripty.'],['high','Overovanie a zložité vzťahy.'],['xhigh / max','Najnáročnejšie úlohy, vyššia spotreba.']].map(([e,t])=>`<div class="session-card"><div><strong>${e}</strong><small>${t}</small></div></div>`).join('')}</div><p class="tiny block-gap">Vyšší effort nedoplní chýbajúci vodič, symbol ani dôkaz. Úrovne majú pri rôznych modeloch odlišný význam a negarantujú správnosť.</p></section>`;
+  const models = state.models.filter(m => !hasExcludedModel(m));
+  return `${heading('Modely pod tvojou kontrolou.', 'Oficiálne doložený názov neznamená automatický prístup v tvojom účte.',button(icon('plus')+' Vlastný model','new-model','primary'))}
+    <div class="info-line" style="margin-bottom:22px">${icon('info')}<div>${h(MODEL_POLICY_MESSAGE)} Predvolené maximum: GPT-6.1 Sol a Opus 5.5. Priorita sa uplatní na hlavný aj alternatívny nástroj. Dostupnosť CLI potvrď vo svojom účte.</div></div>
+    <div class="model-grid">${models.map(m=>`<article class="panel model-card ${m.enabled?'':'disabled'}"><div class="panel-title" style="margin:0">${toolPill(m.tool)}<button class="icon-button" data-action="edit-model" data-id="${h(m.id)}" aria-label="Upraviť model ${h(m.label)}">${icon('edit')}</button></div><h3>${h(m.label.split(' · ')[0])}</h3><code>${h(m.id)}</code><p>${h(m.description)}</p><div class="effort-options">${m.efforts.map(e=>effortPill(e)).join('')}</div><div class="model-footer"><span>${m.status==='documented'?'● Doložené v dokumentácii':'○ Vlastný záznam'}</span><button class="text-link" data-action="toggle-model" data-id="${h(m.id)}">${m.enabled?'Vypnúť':'Zapnúť'}</button></div>${m.source&&/^https:\/\//.test(m.source)?`<a href="${h(m.source)}" rel="noreferrer" target="_blank">Oficiálny zdroj ↗</a>`:''}</article>`).join('')}</div>
+    <section class="panel pad block-gap"><h2>Čo znamená effort?</h2><div class="sessions">${[['low','Rýchle hľadanie a extrakcia.'],['medium','Bežná práca a menšie skripty.'],['high','Overovanie a zložité vzťahy.'],['xhigh / max','Len vedome zvolené náročné úlohy.']].map(([e,t])=>`<div class="session-card"><div><strong>${e}</strong><small>${t}</small></div></div>`).join('')}</div><p class="tiny block-gap">Vyšší effort nedoplní chýbajúci vodič, symbol ani dôkaz. Úrovne majú pri rôznych modeloch odlišný význam a negarantujú správnosť. Max. kvalita automaticky neznamená max effort.</p></section>`;
 }
 function settingsPage() {
   return `${heading('Tvoj kontext. Tvoje nastavenia.', 'API kľúč patrí do serverových secrets. V prehliadači používaš iba prístupové heslo aplikácie.') }<div class="two-col"><div class="settings-stack"><section class="panel pad"><h2>Pracovný profil</h2><form id="profileForm" class="block-gap"><div class="field-grid"><label class="field"><span>Meno</span><input name="name" value="${h(state.profile.name)}" maxlength="100" required></label><label class="field"><span>Rola</span><input name="role" value="${h(state.profile.role)}" maxlength="200" required></label></div><label class="field"><span>S čím pracujem a čo očakávam</span><textarea name="context" maxlength="6000">${h(state.profile.context)}</textarea><small>Tento profil sa priloží k AI otázkam a AI tvorbe skillov.</small></label><div class="form-actions"><button class="button primary" type="submit">Uložiť profil</button></div></form></section><section class="panel pad"><h2>OpenAI cez chránený backend</h2><form id="connectionForm" class="block-gap"><label class="field"><span>Adresa API backendu</span><input name="apiBase" type="url" placeholder="Prázdne = lokálny server tejto aplikácie" value="${h(state.settings.apiBase || window.NAVIGATOR_CONFIG?.apiBase || '')}"><small>Na GitHub Pages sem patrí HTTPS adresa tvojho Worker backendu.</small></label><label class="field"><span>Prístupové heslo aplikácie</span><input name="accessToken" type="password" autocomplete="off" placeholder="APP_ACCESS_TOKEN · nie OpenAI kľúč" value="${h(accessToken)}" minlength="24"><small>Len v pamäti tejto karty. Po obnovení ho zadaj znova.</small></label><div class="field-grid"><label class="field"><span>Model pre API asistenta</span><select name="apiModel">${state.models.filter(m=>m.api&&m.enabled).map(m=>`<option value="${h(m.id)}" ${state.settings.apiModel===m.id?'selected':''}>${h(m.label)}</option>`).join('')}</select></label><label class="field"><span>Effort asistenta</span><select name="apiEffort">${EFFORTS.map(e=>`<option ${state.settings.apiEffort===e?'selected':''}>${e}</option>`).join('')}</select></label></div><div class="form-actions"><button class="button" type="submit">Uložiť a overiť pripojenie</button></div><div id="connectionResult">${connection?.configured&&accessToken?'<p class="success-box">Pripojenie overené. Test neprenášal poznámky ani nevytváral platenú odpoveď.</p>':''}</div></form></section></div><aside class="settings-stack"><section class="panel pad"><h3>Záloha a prenos dát</h3><p class="tiny block-gap">Poznámky, situácie a skills sa ukladajú v tomto prehliadači. Záloha obsahuje všetky tieto dáta; neobsahuje API kľúč ani prístupové heslo.</p><div class="form-actions">${button(icon('download')+' Export JSON','backup','small')}${button('Import zálohy','import','small')}</div><input type="file" id="backupFile" accept="application/json,.json" hidden></section><section class="panel pad"><h3>Nasadenie na GitHub</h3><p class="tiny block-gap">Rozhranie: GitHub Pages cez Actions. API: Cloudflare Worker cez samostatný Actions workflow. Secrets sa neposielajú do verejného webu.</p><p class="tiny block-gap">Zdrojové súbory a Actions: MartinMesko/ai-model-navigator-studio. AI backend pripojíš po nastavení serverových secrets podľa README.</p><a class="button subtle small block-gap" href="https://github.com/MartinMesko/ai-model-navigator-studio" target="_blank" rel="noreferrer">Repozitár a nasadenie ↗</a></section><section class="panel pad"><h3>Oficiálne zdroje</h3><p class="tiny" style="margin:8px 0 15px">Posledné overenie: ${dateLabel(VERIFIED_ON)}</p><div class="source-list">${SOURCES.map(s=>`<a href="${h(s.url)}" target="_blank" rel="noreferrer">${h(s.title)} ↗</a>`).join('')}</div></section></aside></div>`;
@@ -108,6 +137,7 @@ function render() {
   renderNav();
   const views = { navigator:navigatorPage,notes:notesPage,assistant:assistantPage,skills:skillsPage,models:modelsPage,settings:settingsPage };
   $('#main').innerHTML = (storageWarning?`<div class="storage-warning" role="alert">${h(storageWarning)}</div>`:'') + views[route]();
+  if(route==='navigator')$('#tableMount').insertAdjacentHTML('beforebegin',`<p class="tiny policy-note">Tabuľka aj obe voľby používajú rovnakú prioritu. ${h(MODEL_POLICY_MESSAGE)}</p>`);
   if(route==='settings') { const roleField=$('#profileForm [name="role"]'); roleField.required=false; roleField.placeholder='Voliteľná vlastná rola'; }
   if(route==='assistant')updateContextPreview();
   if(route==='skills'){
@@ -124,7 +154,12 @@ function updateContextPreview(){
   const el=$('#contextPreview');if(!el)return;const notes=contextFor();
   el.innerHTML=notes.map(n=>`<div class="context-item">${h(n.title)}<small>${h(n.kind)} · ${h(n.tags)}</small></div>`).join('')||'<p class="tiny">Žiadne povolené poznatky. Pridaj ich v sekcii Poznatky.</p>';
   el.parentElement.querySelector('.panel-title .model-label').textContent=`${notes.length}/12`;
-  el.parentElement.querySelector('details pre').textContent=JSON.stringify({profile:state.profile,notes,situations:state.situations.map(s=>({id:s.id,title:s.title,category:s.category,tool:s.tool,modelId:s.modelId,effort:s.effort,why:s.why})),models:state.models.filter(m=>m.enabled).map(m=>({id:m.id,label:m.label,tool:m.tool,efforts:m.efforts}))},null,2);
+  el.parentElement.querySelector('details pre').textContent=JSON.stringify(aiWorkContext(notes),null,2);
+}
+function aiWorkContext(notes) {
+  return {profile:state.profile, notes, priority:state.settings.priority,
+    situations:state.situations.map(s=>{const r=recommend(s,state.models,state.settings.priority);return {id:s.id,title:s.title,category:s.category,tool:r.workflowTool,modelId:r.model?.id||'',effort:r.effort,why:s.why,humanRequired:!!s.humanRequired,alternativeModelId:r.alternative.model?.id||'',alternativeEffort:r.alternative.effort,secondaryModelId:r.secondary?.model?.id||'',secondaryEffort:r.secondary?.effort||''};}).filter(s=>s.modelId),
+    models:state.models.filter(usableModel).map(m=>({id:m.id,label:m.label,tool:m.tool,efforts:m.efforts}))};
 }
 function openDialog(title, subtitle, content) {
   $('#dialogContent').innerHTML = `<div class="dialog-heading"><div><h2>${h(title)}</h2><p>${h(subtitle)}</p></div><button class="icon-button" data-action="close-dialog" aria-label="Zavrieť">${icon('close')}</button></div>${content}`;
@@ -133,7 +168,17 @@ function openDialog(title, subtitle, content) {
 function option(value,label,selected) { return `<option value="${h(value)}" ${selected===value?'selected':''}>${h(label)}</option>`; }
 function situationEditor(sid) {
   const s = state.situations.find(s=>s.id===sid) || { id:'',title:'',category:'PDF',tool:'Codex',modelId:'gpt-5.6-terra',effort:'medium',session:'search',keywords:[],why:'',alternative:'sonnet' };
-  openDialog(s.id?'Upraviť pracovnú situáciu':'Nová pracovná situácia','Zmeny sa ihneď použijú v playbooku aj v AI kontexte.',`<form id="situationForm"><input type="hidden" name="id" value="${h(s.id)}"><label class="field"><span>Situácia v práci</span><input name="title" maxlength="300" value="${h(s.title)}" required></label><div class="field-grid"><label class="field"><span>Kategória</span><select name="category">${CATEGORIES.map(c=>option(c,c,s.category)).join('')}</select></label><label class="field"><span>Nástroj / workflow</span><select name="tool">${['Codex','Claude Code','Codex + Claude','Claude + človek'].map(t=>option(t,t,s.tool)).join('')}</select></label><label class="field"><span>Odporúčaný model</span><select name="modelId">${state.models.map(m=>option(m.id,m.label,s.modelId)).join('')}</select></label><label class="field"><span>Effort</span><select name="effort">${EFFORTS.map(e=>option(e,e,s.effort)).join('')}</select></label><label class="field"><span>Session</span><select name="session">${SESSIONS.map(a=>option(a.id,a.name,s.session)).join('')}</select></label><label class="field"><span>Alternatívny model</span><select name="alternative">${state.models.map(m=>option(m.id,m.label,s.alternative)).join('')}</select></label></div><label class="field"><span>Kľúčové slová · oddelené čiarkou</span><input name="keywords" maxlength="1000" value="${h(s.keywords.join(', '))}"></label><label class="field"><span>Prečo / overovací postup</span><textarea name="why" maxlength="3000">${h(s.why)}</textarea></label><label class="checkbox"><input name="humanRequired" type="checkbox" ${s.humanRequired?'checked':''}>Vyžaduje konečné posúdenie človekom</label><div class="form-actions">${s.id?button('Odstrániť','delete-situation','danger small',`data-id="${h(s.id)}"`):''}${button('Zrušiť','close-dialog','subtle')}<button class="button primary" type="submit">Uložiť situáciu</button></div></form>`);
+  const models=state.models.filter(m=>!hasExcludedModel(m));
+  openDialog(s.id?'Upraviť pracovnú situáciu':'Nová pracovná situácia','Upravuješ základ pre Vyvážený režim. Ostatné priority sa z neho odvodia pre obe voľby.',`<form id="situationForm"><input type="hidden" name="id" value="${h(s.id)}">
+    <label class="field"><span>Situácia v práci</span><input name="title" maxlength="300" value="${h(s.title)}" required></label><div class="field-grid">
+    <label class="field"><span>Kategória</span><select name="category">${CATEGORIES.map(c=>option(c,c,s.category)).join('')}</select></label>
+    <label class="field"><span>Nástroj / workflow</span><select name="tool">${['Codex','Claude Code','Codex + Claude','Claude + človek'].map(t=>option(t,t,s.tool)).join('')}</select></label>
+    <label class="field"><span>Základný model</span><select name="modelId">${models.map(m=>option(m.id,m.label,s.modelId)).join('')}</select></label>
+    <label class="field"><span>Základný effort</span><select name="effort">${EFFORTS.map(e=>option(e,e,s.effort)).join('')}</select></label>
+    <label class="field"><span>Session</span><select name="session">${SESSIONS.map(a=>option(a.id,a.name,s.session)).join('')}</select></label>
+    <label class="field"><span>Alternatívny model · nástroj je uvedený pri modeli</span><select name="alternative">${models.map(m=>option(m.id,m.tool+' · '+m.label,s.alternative)).join('')}</select></label>
+    <label class="field"><span>Základný effort alternatívy</span><select name="alternativeEffort">${EFFORTS.map(e=>option(e,e,s.alternativeEffort||s.effort)).join('')}</select></label></div>
+    <label class="field"><span>Kľúčové slová · oddelené čiarkou</span><input name="keywords" maxlength="1000" value="${h(s.keywords.join(', '))}"></label><label class="field"><span>Prečo / overovací postup</span><textarea name="why" maxlength="3000">${h(s.why)}</textarea></label><label class="checkbox"><input name="humanRequired" type="checkbox" ${s.humanRequired?'checked':''}>Vyžaduje konečné posúdenie človekom</label><div class="form-actions">${s.id?button('Odstrániť','delete-situation','danger small',`data-id="${h(s.id)}"`):''}${button('Zrušiť','close-dialog','subtle')}<button class="button primary" type="submit">Uložiť situáciu</button></div></form>`);
 }
 function noteEditor(nid, initial = {}) {
   const n = state.notes.find(n=>n.id===nid) || { id:'',title:'',content:'',tags:'',kind:'Poznámka',useInAI:true,...initial };
@@ -168,10 +213,13 @@ async function askAI(kind, message, extra={}) {
   if(!accessToken){toast('Najprv nastav pripojenie a heslo aplikácie.');location.hash='settings';return;}
   if(hasSecret(message)){toast('Do otázky nepatrí API kľúč. Odstráň ho.');return;}
   const notes=extra.notes||contextFor(message);
-  const payload={kind,message,profile:state.profile,notes,situations:state.situations.map(s=>({id:s.id,title:s.title,category:s.category,tool:s.tool,modelId:s.modelId,effort:s.effort,why:s.why})),models:state.models.filter(m=>m.enabled).map(m=>({id:m.id,label:m.label,tool:m.tool,efforts:m.efforts})),model:state.settings.apiModel,effort:state.settings.apiEffort};
+  const payload={kind,message,...aiWorkContext(notes),model:state.settings.apiModel,effort:state.settings.apiEffort};
+  if(hasExcludedModel(payload.model)){toast(MODEL_POLICY_MESSAGE);return;}
+  const apiModel=modelOf(payload.model);if(!usableModel(apiModel)||!apiModel.api||!apiModel.efforts.includes(payload.effort)){toast('Vyber dostupný API model a jeho podporovaný effort v nastaveniach.');return;}
   if(hasSecret(JSON.stringify(payload))){toast('Kontext obsahuje API kľúč. Odstráň ho z profilu alebo poznámok.');return;}
   aiBusy=true;aiError='';activeController=new AbortController(); const timeout=setTimeout(()=>activeController?.abort(),120000);render();
   try { const result=await api('/api/assist',payload,activeController.signal);
+    if(hasExcludedRecommendation(result.data)||hasExcludedModel(result.model||''))throw new Error('Odpoveď obsahovala vyradený model a nebola zobrazená.');
     if(kind==='skill'){generatedSkill=result.data.skillMarkdown; skillSource='ai'; if(route==='skills')render();}
     else{answer=result;activity('AI odpoveď na: '+message.slice(0,80));save();}
     toast(kind==='skill'?'AI návrh skillu je pripravený na kontrolu.':'Odpoveď je pripravená.');
@@ -183,12 +231,14 @@ document.addEventListener('click',async event=>{
   const actionElement=event.target.closest('[data-action]');
   if(!actionElement){const row=event.target.closest('[data-select]');if(row){selectedId=row.dataset.select;render();}return;}
   const {action,id:targetId,value}=actionElement.dataset;
+  if(['save-generated','download-generated'].includes(action)&&hasExcludedModel($('#generatedSkill')?.value||generatedSkill)){toast('Návrh obsahuje vyradený model. Najprv ho uprav.');return;}
+  if(action==='download-skill'&&hasExcludedModel(state.skills.find(s=>s.id===targetId)?.content||'')){toast('Starší skill obsahuje vyradený model. Pred použitím ho uprav; pôvodný text ostáva zachovaný.');return;}
   if(action==='close-dialog'){$('#editor').close();return;}
   if(action==='new-situation')return situationEditor();
   if(action==='edit-situation')return situationEditor(targetId);
   if(action==='category'){category=value;const rows=rankSituations(state.situations,query,category);if(!rows.some(s=>s.id===selectedId))selectedId=rows[0]?.id;render();return;}
   if(action==='priority'){state.settings.priority=value;save();render();return;}
-  if(action==='copy-command'){const s=state.situations.find(s=>s.id===targetId);if(!s)return;const r=recommend(s,state.models,state.settings.priority),c=cliCommand(r.model,r.effort);if(c)await copy(c.launch+(r.model.tool==='Codex'?`\n# Po štarte: /reasoning → ${r.effort}`:''));return;}
+  if(action==='copy-command'){const s=state.situations.find(s=>s.id===targetId);if(!s)return;const r=recommend(s,state.models,state.settings.priority),chosen=actionElement.dataset.choice==='alternative'?r.alternative:actionElement.dataset.choice==='secondary'?r.secondary:r,c=cliCommand(chosen?.model,chosen?.effort);if(c)await copy(c.launch+(chosen.model.tool==='Codex'?`\n# Po štarte: /reasoning → ${chosen.effort}`:''));return;}
   if(action==='ask-situation'){question=state.situations.find(s=>s.id===targetId)?.title||'';location.hash='assistant';return;}
   if(action==='new-note')return noteEditor();
   if(action==='edit-note')return noteEditor(targetId);
@@ -197,7 +247,7 @@ document.addEventListener('click',async event=>{
   if(action==='connection'){location.hash='settings';return;}
   if(action==='new-model')return modelEditor();
   if(action==='edit-model')return modelEditor(targetId);
-  if(action==='toggle-model'){const m=modelOf(targetId);if(m){m.enabled=!m.enabled;save();render();}return;}
+  if(action==='toggle-model'){const m=modelOf(targetId);if(m&&!hasExcludedModel(m)){m.enabled=!m.enabled;save();render();}return;}
   if(action==='cancel-ai'){activeController?.abort();return;}
   if(action==='save-answer'&&answer)return noteEditor(null,{title:question.slice(0,150)||'AI návrh',content:answer.data.answer+'\n\n'+answer.data.steps.join('\n'),kind:'AI návrh',useInAI:false,tags:'AI, na overenie'});
   if(action==='answer-situation'){selectedId=targetId;location.hash='navigator';return;}
@@ -215,7 +265,7 @@ document.addEventListener('keydown',event=>{
   if(event.key==='/'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&!$('#editor').open){const input=$('#situationSearch');if(input){event.preventDefault();input.focus();}}
 });
 document.addEventListener('input',event=>{
-  if(event.target.id==='situationSearch'){query=event.target.value;$('#tableMount').innerHTML=tableHTML();}
+  if(event.target.id==='situationSearch'){const position=event.target.selectionStart;query=event.target.value;const rows=rankSituations(state.situations,query,category);if(!rows.some(s=>s.id===selectedId))selectedId=rows[0]?.id;render();$('#situationSearch')?.focus();$('#situationSearch')?.setSelectionRange(position,position);}
   if(event.target.id==='noteSearch'){const position=event.target.selectionStart;noteQuery=event.target.value;render();$('#noteSearch')?.focus();$('#noteSearch')?.setSelectionRange(position,position);}
   if(event.target.id==='question'){question=event.target.value;updateContextPreview();}
   if(event.target.closest('#skillForm')){const form=$('#skillForm');skillDraft={name:form.elements.namedItem('name').value,goal:form.elements.namedItem('goal').value,situationId:form.elements.namedItem('situationId').value,useNotes:form.elements.namedItem('useNotes').checked};}
@@ -228,6 +278,14 @@ document.addEventListener('change',async event=>{
 document.addEventListener('submit',async event=>{
   event.preventDefault();const form=event.target;const formId=form.getAttribute('id');const data=Object.fromEntries(new FormData(form));
   if(hasSecret(JSON.stringify(data))){toast('Sem nepatrí OpenAI API kľúč. Použi iba serverové secrets.');return;}
+  if(formId==='modelForm'&&(hasExcludedModel(data)||!modelTool(data))){toast('Tento model je vyradený alebo nepatrí do zvoleného nástroja.');return;}
+  if(formId==='situationForm'){
+    const main=modelOf(data.modelId),alt=modelOf(data.alternative),expected=data.tool.startsWith('Codex')?'Codex':'Claude Code';
+    if(!usableModel(main)||!usableModel(alt)||modelTool(main)!==expected){toast('Vyber dostupné povolené modely; hlavný model musí patriť do zvoleného nástroja.');return;}
+    if(!alt.efforts.includes(data.alternativeEffort)){toast('Alternatívny model nepodporuje zvolený effort.');return;}
+  }
+  if(formId==='connectionForm'&&hasExcludedModel(data.apiModel)){toast(MODEL_POLICY_MESSAGE);return;}
+  if(['skillForm','editSkillForm'].includes(formId)&&hasExcludedModel(JSON.stringify(data))){toast('Skill nesmie navrhovať vyradený model. Uprav jeho zadanie alebo text.');return;}
   if(formId==='situationForm'){const m=modelOf(data.modelId);if(m&&!m.efforts.includes(data.effort)){toast('Zvolený model nemá tento effort v katalógu.');return;}const existing=state.situations.find(s=>s.id===data.id);const s={...existing,...data,id:data.id||id(),humanRequired:!!data.humanRequired,keywords:data.keywords.split(',').map(k=>k.trim()).filter(Boolean).slice(0,30),updatedAt:new Date().toISOString()};if(existing)Object.assign(existing,s);else state.situations.push(s);selectedId=s.id;activity('Upravená situácia: '+s.title);save();$('#editor').close();render();toast('Situácia uložená.');}
   if(formId==='noteForm'){const existing=state.notes.find(n=>n.id===data.id);const n={...data,id:data.id||id(),useInAI:!!data.useInAI,updatedAt:new Date().toISOString()};if(existing)Object.assign(existing,n);else state.notes.push(n);activity('Uložený poznatok: '+n.title);save();$('#editor').close();render();toast('Poznatok uložený.');}
   if(formId==='modelForm'){if(!/^[a-zA-Z0-9][a-zA-Z0-9._:[\]-]{0,100}$/.test(data.id)){toast('Neplatný CLI identifikátor modelu.');return;}if(data.api&&data.tool!=='Codex'){toast('OpenAI API asistent podporuje iba OpenAI modely.');return;}const efforts=new FormData(form).getAll('efforts');if(!efforts.length){toast('Vyber aspoň jednu úroveň effort.');return;}if(data.id!==data.originalId&&modelOf(data.id)){toast('Tento identifikátor už existuje.');return;}const existing=modelOf(data.originalId);const m={...existing,id:data.id,label:data.label,tool:data.tool,tier:Number(data.tier),description:data.description,enabled:!!data.enabled,api:!!data.api,efforts,status:'custom',verifiedOn:null,source:existing?.source||''};if(existing){Object.assign(existing,m);state.situations.forEach(s=>{for(const key of ['modelId','alternative','secondaryModelId'])if(s[key]===data.originalId)s[key]=m.id;});}else state.models.push(m);save();$('#editor').close();render();toast('Katalóg aktualizovaný.');}

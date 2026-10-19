@@ -8,6 +8,14 @@ Originálny červeno-čierny retro sci-fi layout s neonovým titulkom, jemne ani
 
 Pôvodné predvyplnené označenie roly sa pri načítaní starých dát a importe odstráni; vlastná rola, poznatky, skills a úpravy situácií zostávajú zachované. Rola je voliteľná.
 
+## Výber modelov 2.2
+
+- Astra a Fable sú na výslovné želanie používateľa vyradené z odporúčaní, editora nových modelov, generovaných príkazov a API. Katalóg nových dát ponúka Terra, Luna, Sol, Haiku, Sonnet a Opus. Je to osobná politika aplikácie, nie tvrdenie o nedostupnosti vyradených modelov.
+- Max. kvalita predvolene volí Sol / high a Opus / high. Vyvážený režim používa upraviteľný základ situácie; Rýchlosť vyberá nižšiu povolenú triedu. Obe možnosti rešpektujú rovnakú prioritu. Vyšší už nastavený effort sa pri Max. kvalite neznižuje a bezpečnostná kontrola človekom sa zachová.
+- Tabuľka, hlavná karta, alternatíva, druhý agent, CLI aj kontext pre AI vychádzajú z jedného výberového pravidla. Alternatíva má vlastný nástroj, model, effort, dôvod a kopírovateľný príkaz. Dve voľby v rovnakom nástroji nesmú opakovať ten istý model.
+- Načítanie localStorage aj import starej zálohy premapuje odkazy na vyradené modely na Sol alebo Opus. Staré záznamy modelov zostanú v zálohe vypnuté a v rozhraní sa neponúkajú. Poznámky, texty skills, osobný profil a vlastné zdôvodnenia sa nemažú. Starší skill obsahujúci vyradený model treba pred stiahnutím upraviť.
+- Server filtruje aj staré `ALLOWED_MODELS`, zakáže platené volanie vyradeného modelu a odmietne AI odpoveď, ktorá by ho navrhla. AI odpoveď sa pri takom odmietnutí automaticky neopakuje. Regresné testy používajú simulovaného poskytovateľa, nie platené API volania.
+
 ## Nasadené adresy
 
 - [Navigator Studio](https://martinmesko.github.io/ai-model-navigator-studio/) – web nasadzovaný cez GitHub Actions.
@@ -90,8 +98,8 @@ V rámci jednej Pages domény môžu rôzne projekty zdieľať origin pre localS
 
 ## Modely a CLI – overené 19. 10. 2026
 
-- OpenAI dokumentuje `gpt-5.6-terra`, `gpt-6-luna`, `gpt-6.1-sol`, `gpt-6-astra`. API prístup a Codex CLI prístup sú rozdielne; over ich v konkrétnom účte.
-- Claude Code oficiálne uvádza Opus 5.5, Sonnet 5.5, Haiku 5.5 aj Fable 5.1. Použité sú doložené CLI aliasy `opus`, `sonnet`, `haiku`, `fable`; poskytovateľ môže mapovať alias na iný konkrétny model.
+- V aplikácii sa používajú doložené OpenAI identifikátory `gpt-5.6-terra`, `gpt-6-luna`, `gpt-6.1-sol`. API prístup a Codex CLI prístup sú rozdielne; over ich v konkrétnom účte.
+- Použité Claude Code modely sú Opus 5.5, Sonnet 5.5 a Haiku 5.5 s CLI aliasmi `opus`, `sonnet`, `haiku`; poskytovateľ môže mapovať alias na iný konkrétny model.
 - Claude CLI: `claude --model 'sonnet' --effort high`.
 - Codex CLI: `codex --model 'gpt-6.1-sol'`; effort vyber interaktívne v `/reasoning`. Aplikácia nepridáva nedoložený Codex prepínač.
 - Odporúčania podľa pracovných situácií sú osobný tréningový playbook, nie meranie presnosti modelov na dokumentácii Gotostocku.

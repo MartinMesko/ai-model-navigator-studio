@@ -133,6 +133,11 @@ main { padding-top: 26px; }
 .why { color: #c3aeba; }
 .alternative { background: #0e0b12; border: 1px solid #43283b; border-radius: 4px; color: #b99bad; }
 .alternative strong { color: #e6d2e0; }
+.alternative strong { font-size: 12px; margin: 8px 0; }
+.choice-label { color: #f39bb5; font: 9px ui-monospace, monospace; letter-spacing: 1px; }
+.choice-effort { display: flex; align-items: center; gap: 9px; color: #d5adc1; font-size: 10px; }
+.choice-reason { margin: 12px 0; font-size: 10px; color: #d0adbf; line-height: 1.85; }
+.policy-note { padding: 10px 0; border-top: 1px solid #5c3145; line-height: 1.8; }
 .code-block { background: #090a0f; border-color: #633a4e; border-radius: 4px; }
 .code-header { color: #ce92a7; border-color: #432436; font-family: ui-monospace, monospace; letter-spacing: .7px; }
 .code-block pre { color: #f2bac8; }
