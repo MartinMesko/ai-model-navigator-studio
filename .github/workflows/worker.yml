@@ -1,0 +1,37 @@
+name: Deploy protected AI backend
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ai-backend
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ai-production
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - run: npm run check
+      - run: npm test
+      - name: Verify runtime secrets
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          APP_ACCESS_TOKEN: ${{ secrets.APP_ACCESS_TOKEN }}
+        run: |
+          node --input-type=module -e "if (!process.env.OPENAI_API_KEY || (process.env.APP_ACCESS_TOKEN || '').length < 24) throw new Error('Configure a new OPENAI_API_KEY and APP_ACCESS_TOKEN before deployment.');"
+      - name: Deploy Worker and runtime secrets
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+          secrets: |
+            OPENAI_API_KEY
+            APP_ACCESS_TOKEN
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          APP_ACCESS_TOKEN: ${{ secrets.APP_ACCESS_TOKEN }}

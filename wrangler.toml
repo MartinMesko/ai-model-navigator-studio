@@ -1,0 +1,18 @@
+name = "ai-model-navigator-api"
+main = "worker/index.mjs"
+compatibility_date = "2026-10-19"
+
+[vars]
+OPENAI_MODEL = "gpt-6.1-sol"
+ALLOWED_MODELS = "gpt-6-luna,gpt-5.6-terra,gpt-6.1-sol,gpt-6-astra"
+ALLOWED_ORIGINS = "https://martinmesko.github.io"
+DAILY_REQUEST_LIMIT = "30"
+MAX_OUTPUT_TOKENS = "4000"
+
+[[durable_objects.bindings]]
+name = "USAGE_GATE"
+class_name = "UsageGate"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["UsageGate"]

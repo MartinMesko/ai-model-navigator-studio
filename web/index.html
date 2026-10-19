@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Osobný pracovný priestor pre výber AI modelov, technické poznatky a tvorbu skills.">
+  <title>Navigator Studio · Martinov AI workspace</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./runtime-config.js"></script>
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Preskočiť na obsah</a>
+  <aside class="sidebar" aria-label="Hlavná navigácia">
+    <a class="brand" href="#navigator"><span class="brand-symbol">N<span>↗</span></span><span>navigator<small>STUDIO / OSOBNÝ WORKSPACE</small></span></a>
+    <div class="workspace-label">PRACOVNÝ PRIESTOR</div>
+    <nav id="nav"></nav>
+    <div class="sidebar-bottom"><div class="private-tag"><span class="live-dot"></span> Dáta v tvojom prehliadači</div><div class="user-card"><div class="avatar">MM</div><div><strong id="userName">Martin</strong><small>Junior AI technik</small></div><a href="https://github.com/MartinMesko" target="_blank" rel="noreferrer" aria-label="Martinov GitHub">↗</a></div></div>
+  </aside>
+  <div class="workspace"><header class="topbar"><div class="breadcrumb">MÔJ WORKSPACE <span>/</span> <strong id="pageName">Navigátor</strong></div><div class="top-actions"><button class="button subtle small" data-action="backup" title="Export všetkých poznatkov a nastavení">Zálohovať</button><button class="connection-badge" id="connectionBadge" data-action="connection"><span class="live-dot offline"></span><span>AI nepripojená</span></button></div></header>
+    <main id="main" tabindex="-1"></main>
+    <footer class="app-footer"><span>NAVIGATOR STUDIO <b>2.0</b></span><span>Pravidlá + tvoje poznatky + AI kontext</span><a href="#settings">Zdroje a nastavenia ↗</a></footer>
+  </div>
+  <dialog id="editor"><div id="dialogContent"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <noscript>Na používanie aplikácie povoľ JavaScript.</noscript>
+</body>
+</html>
