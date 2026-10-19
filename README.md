@@ -2,6 +2,14 @@
 
 Osobná responzívna aplikácia v slovenčine pre Junior AI technika. Dark mode, editovateľný výber Codex vs Claude Code, poznatky z praxe a dielňa Skills. Nový samostatný projekt; pôvodný lokálny HTML Navigator ostáva k dispozícii.
 
+## Nasadené adresy
+
+- [Navigator Studio](https://martinmesko.github.io/ai-model-navigator-studio/) – web nasadzovaný cez GitHub Actions.
+- API backend: `https://ai-model-navigator-api.martin-mesko.workers.dev` – nasadený do Cloudflare Workers. Bez `OPENAI_API_KEY` a `APP_ACCESS_TOKEN` zostávajú AI volania uzamknuté.
+- [GitHub Actions](https://github.com/MartinMesko/ai-model-navigator-studio/actions).
+
+Prvé nasadenie backendu bolo vykonané oficiálnym Wrangler CLI po schválenej Cloudflare autorizácii. GitHub premenná `API_BASE_URL` už smeruje na tento backend. Pre ďalšie nasadzovanie backendu cez pripravený Actions workflow doplň jeho vlastný Cloudflare API token a ostatné secrets podľa postupu nižšie. OAuth prihlásenie uložené v počítači sa nekopíruje do GitHubu.
+
 ## Čo funguje
 
 - 15 pracovných situácií podľa dodaného zadania, plne editovateľných; vlastné situácie možno pridávať a odstraňovať.
