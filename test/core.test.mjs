@@ -33,3 +33,14 @@ test('local skill has scoped frontmatter and uses selected knowledge',()=>{
   const s=initialState(),md=localSkill({name:'Kontrola relé K12',goal:'Overiť kontakty',notes:[{title:'Pravidlo',content:'Uveď stranu 12'}],situation:SITUATIONS[0],profile:s.profile});
   assert.match(md,/^---\nname: kontrola-rele-k12\ndescription:/);assert.match(md,/Uveď stranu 12/);assert.match(md,/## Overenie/);
 });
+test('retired default role is removed without changing personal content',()=>{
+  const state=initialState();assert.equal(state.profile.role,'');
+  state.profile.role='Junior AI technik';
+  state.notes.push({id:'note',title:'Vlastný poznatok',content:'Zachovať dôkaz',kind:'Pravidlo',tags:'QA',useInAI:true});
+  state.situations[0].why='Môj vlastný postup';
+  const migrated=validateBackup(state);
+  assert.equal(migrated.profile.role,'');assert.deepEqual(migrated.notes,state.notes);assert.deepEqual(migrated.situations,state.situations);
+  state.profile.role='Harness Engineer';assert.equal(validateBackup(state).profile.role,'Harness Engineer');
+  const md=localSkill({name:'QA',goal:'Overiť zapojenie',notes:[],situation:state.situations[0],profile:migrated.profile});
+  assert.ok(!md.includes('Junior AI technik'));assert.ok(!md.includes('## Pracovný kontext\n:'));
+});

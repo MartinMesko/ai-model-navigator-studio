@@ -1,5 +1,5 @@
-import { initialState, CATEGORIES, EFFORTS, SESSIONS, SOURCES, VERIFIED_ON } from './data.mjs';
-import { id, escapeHtml as h, rankSituations, recommend, cliCommand, selectNotes, localSkill, validateBackup, hasSecret } from './core.mjs';
+import { initialState, CATEGORIES, EFFORTS, SESSIONS, SOURCES, VERIFIED_ON } from './data.mjs?v=2.1';
+import { id, escapeHtml as h, rankSituations, recommend, cliCommand, selectNotes, localSkill, validateBackup, hasSecret } from './core.mjs?v=2.1';
 
 const STORAGE = 'navigator-studio-v2';
 let state = initialState();
@@ -45,7 +45,9 @@ const toolPill = tool => `<span class="tool-pill ${tool?.includes('Claude') ? 'c
 const effortPill = effort => `<span class="effort ${h(effort)}">${h(effort)}</span>`;
 const noteKind = kind => `<span class="label">${h(kind)}</span>`;
 const dateLabel = value => { const d = new Date(value); return Number.isNaN(d.valueOf()) ? '' : d.toLocaleDateString('sk-SK'); };
-const heading = (title, subtitle, actions = '') => `<div class="page-heading"><div><div class="eyebrow">MARTINOV AI WORKSPACE</div><h1>${title}</h1><p>${subtitle}</p></div><div class="heading-actions">${actions}</div></div>`;
+const heading = (title, subtitle, actions = '') => route === 'navigator'
+  ? `<section class="command-hero" aria-labelledby="heroTitle"><div class="hero-copy"><div class="eyebrow"><span class="hero-signal" aria-hidden="true"></span> OSOBNÝ RIADIACI PRIESTOR <span class="hero-index">/ 001</span></div><h1 id="heroTitle">NAVIGATOR<span>STUDIO</span></h1><p class="hero-caption">${title}</p><p class="hero-description">${subtitle}</p><div class="hero-actions">${actions}<span class="hero-mode">PRAVIDLÁ <i>·</i> POZNATKY <i>·</i> AI</span></div></div><div class="signal-portal" aria-hidden="true"><div class="portal-grid"></div><div class="portal-ring"></div><div class="portal-core">N<span>STUDIO</span></div><span class="portal-cross top">+</span><span class="portal-cross bottom">+</span><span class="portal-readout">04 SESSIONS / JEDEN WORKSPACE</span></div></section>`
+  : `<div class="page-heading"><div><div class="eyebrow">MARTINOV AI WORKSPACE</div><h1>${title}</h1><p>${subtitle}</p></div><div class="heading-actions">${actions}</div></div>`;
 function save() {
   try { localStorage.setItem(STORAGE, JSON.stringify(state)); storageWarning = ''; }
   catch { storageWarning = 'Prehliadač nedokázal uložiť dáta. Urob export zálohy; aktuálne zmeny ostávajú iba v pamäti tejto karty.'; toast(storageWarning); }
@@ -106,6 +108,7 @@ function render() {
   renderNav();
   const views = { navigator:navigatorPage,notes:notesPage,assistant:assistantPage,skills:skillsPage,models:modelsPage,settings:settingsPage };
   $('#main').innerHTML = (storageWarning?`<div class="storage-warning" role="alert">${h(storageWarning)}</div>`:'') + views[route]();
+  if(route==='settings') { const roleField=$('#profileForm [name="role"]'); roleField.required=false; roleField.placeholder='Voliteľná vlastná rola'; }
   if(route==='assistant')updateContextPreview();
   if(route==='skills'){
     const form=$('#skillForm');

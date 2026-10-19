@@ -9,8 +9,8 @@ const root=fileURLToPath(new URL('../web/',import.meta.url));
 const port=Number(process.env.PORT)||8787,host=process.env.HOST||'127.0.0.1';
 const env={...process.env,ALLOWED_ORIGINS:process.env.ALLOWED_ORIGINS||`http://127.0.0.1:${port},http://localhost:${port}`};
 const limiter=memoryLimiter(env);
-const staticFiles=new Set(['/','/index.html','/styles.css','/app.mjs','/core.mjs','/data.mjs','/favicon.svg','/runtime-config.js']);
-const mime={'.html':'text/html;charset=utf-8','.css':'text/css;charset=utf-8','.mjs':'text/javascript;charset=utf-8','.js':'text/javascript;charset=utf-8','.svg':'image/svg+xml'};
+const staticFiles=new Set(['/','/index.html','/styles.css','/theme.css','/fonts/orbitron-700.ttf','/fonts/OFL.txt','/app.mjs','/core.mjs','/data.mjs','/favicon.svg','/runtime-config.js']);
+const mime={'.html':'text/html;charset=utf-8','.css':'text/css;charset=utf-8','.mjs':'text/javascript;charset=utf-8','.js':'text/javascript;charset=utf-8','.svg':'image/svg+xml','.ttf':'font/ttf','.txt':'text/plain;charset=utf-8'};
 const csp="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https: http://127.0.0.1:* http://localhost:*; object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
 export const server=createServer(async(req,res)=>{
   try{

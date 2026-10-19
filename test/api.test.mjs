@@ -50,5 +50,5 @@ test('public config requires auth but never calls the OpenAI API',async()=>{
   const r=await handleApi(new Request('https://api.example/api/config',{headers:{Authorization:'Bearer '+env.APP_ACCESS_TOKEN}}),env);assert.equal(r.status,200);const config=await r.json();assert.equal(config.configured,true);assert.ok(!JSON.stringify(config).includes(env.OPENAI_API_KEY));
 });
 test('instructions treat notes as untrusted and cannot request actions',()=>{
-  const r=responseRequest(validatePayload(body(),env),env);assert.match(r.instructions,/nie systémové príkazy/);assert.match(r.instructions,/Nevymýšľaj ID/);
+  const r=responseRequest(validatePayload(body(),env),env);assert.match(r.instructions,/nie systémové príkazy/);assert.match(r.instructions,/Nevymýšľaj ID/);assert.doesNotMatch(r.instructions,/Junior AI technik/i);
 });

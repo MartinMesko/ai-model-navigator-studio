@@ -1,6 +1,12 @@
 # Navigator Studio
 
-Osobná responzívna aplikácia v slovenčine pre Junior AI technika. Dark mode, editovateľný výber Codex vs Claude Code, poznatky z praxe a dielňa Skills. Nový samostatný projekt; pôvodný lokálny HTML Navigator ostáva k dispozícii.
+Osobná responzívna aplikácia v slovenčine. Retro sci-fi dark mode, editovateľný výber Codex vs Claude Code, poznatky z praxe a dielňa Skills. Nový samostatný projekt; pôvodný lokálny HTML Navigator ostáva k dispozícii.
+
+## Vzhľad 2.1
+
+Originálny červeno-čierny retro sci-fi layout s neonovým titulkom, jemne animovaným portálom a technickými nadpismi. Neobsahuje filmové logá ani prevzaté filmové fonty. Nadpisy používajú lokálne pribalený [Orbitron](https://github.com/google/fonts/tree/main/ofl/orbitron) pod licenciou SIL OFL 1.1 (`web/fonts/OFL.txt`); bežné texty zostávajú čitateľné systémovým písmom. Načítanie fontu nevolá externú službu. Animácia rešpektuje systémové nastavenie obmedzeného pohybu.
+
+Pôvodné predvyplnené označenie roly sa pri načítaní starých dát a importe odstráni; vlastná rola, poznatky, skills a úpravy situácií zostávajú zachované. Rola je voliteľná.
 
 ## Nasadené adresy
 

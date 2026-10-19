@@ -1,4 +1,4 @@
-import { EFFORTS, initialState } from './data.mjs';
+import { EFFORTS, initialState } from './data.mjs?v=2.1';
 
 export const normal = value => String(value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 export const id = () => globalThis.crypto.randomUUID();
@@ -38,7 +38,7 @@ export function localSkill({ name, goal, notes, situation, profile }) {
   const slug = normal(name).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64) || 'moj-skill';
   const description = `${(goal || name).replace(/[.!?]+$/,'')}. Použi pri práci s ${situation?.category || 'technickou dokumentáciou'}.`.replace(/[\r\n]+/g, ' ');
   const rules = notes.map(n => `- ${n.title}: ${n.content}`).join('\n');
-  return `---\nname: ${slug}\ndescription: ${JSON.stringify(description)}\n---\n\n# ${name}\n\n## Cieľ\n${goal}\n\n## Pracovný kontext\n${profile.role}: ${profile.context}\n\n## Postup\n1. Identifikuj zdrojové dokumenty, revízie a potrebné vstupy.\n2. Over presné označenia doslovným vyhľadávaním alebo vhodným lokálnym nástrojom.\n3. Pri technickom závere uveď stranu, označenie a dôkaz. Ak dôkaz chýba, zaznamenaj neistotu.\n4. Výsledok skontroluj proti pôvodným podkladom a vypíš nevyriešené body.\n\n## Schválené poznatky\n${rules || '- Zatiaľ bez pridaných poznatkov. Pred použitím doplň pravidlá z praxe.'}\n\n## Očakávaný výstup\n- Stručný výsledok, odkazy na dôkazy, neistoty a ďalší overiteľný krok.\n\n## Overenie\n- Porovnaj aspoň jeden známy príklad a jeden prípad s chýbajúcim dôkazom.\n- Nevydávaj nevykonaný test alebo kontrolu za hotovú.\n`;
+  return `---\nname: ${slug}\ndescription: ${JSON.stringify(description)}\n---\n\n# ${name}\n\n## Cieľ\n${goal}\n\n## Pracovný kontext\n${profile.role ? profile.role + ': ' : ''}${profile.context}\n\n## Postup\n1. Identifikuj zdrojové dokumenty, revízie a potrebné vstupy.\n2. Over presné označenia doslovným vyhľadávaním alebo vhodným lokálnym nástrojom.\n3. Pri technickom závere uveď stranu, označenie a dôkaz. Ak dôkaz chýba, zaznamenaj neistotu.\n4. Výsledok skontroluj proti pôvodným podkladom a vypíš nevyriešené body.\n\n## Schválené poznatky\n${rules || '- Zatiaľ bez pridaných poznatkov. Pred použitím doplň pravidlá z praxe.'}\n\n## Očakávaný výstup\n- Stručný výsledok, odkazy na dôkazy, neistoty a ďalší overiteľný krok.\n\n## Overenie\n- Porovnaj aspoň jeden známy príklad a jeden prípad s chýbajúcim dôkazom.\n- Nevydávaj nevykonaný test alebo kontrolu za hotovú.\n`;
 }
 export function validateBackup(value) {
   if (!value || value.version !== 2 || !Array.isArray(value.situations) || !Array.isArray(value.models) || !Array.isArray(value.notes) || !Array.isArray(value.skills)) throw new Error('Súbor nie je záloha Navigator Studio verzie 2.');
@@ -55,5 +55,8 @@ export function validateBackup(value) {
   const settings = { ...fresh.settings, ...value.settings };
   const apiBase = settings.apiBase || '';
   if (apiBase) { const url = new URL(apiBase); if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) throw new Error('API adresa musí používať HTTPS alebo lokálny server.'); }
-  return { ...fresh, profile: { name: String(value.profile?.name || 'Martin').slice(0, 100), role: String(value.profile?.role || '').slice(0, 200), context: String(value.profile?.context || '').slice(0, 6000) }, situations: value.situations, models: value.models, notes: value.notes, skills: value.skills, history: Array.isArray(value.history) ? value.history.slice(-30) : [], settings };
+  const savedRole = String(value.profile?.role || '').slice(0, 200);
+  // Remove the retired default from existing browser data and imported backups only.
+  const role = /^junior\s+ai\s+technik$/.test(normal(savedRole).trim()) ? '' : savedRole;
+  return { ...fresh, profile: { name: String(value.profile?.name || 'Martin').slice(0, 100), role, context: String(value.profile?.context || '').slice(0, 6000) }, situations: value.situations, models: value.models, notes: value.notes, skills: value.skills, history: Array.isArray(value.history) ? value.history.slice(-30) : [], settings };
 }

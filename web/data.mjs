@@ -45,5 +45,5 @@ export const SITUATIONS = [
   situation('safety-review', 'Kriticky preveriť bezpečnostne dôležité zapojenie', 'Schémy', 'Claude + človek', 'opus', 'xhigh', 'qa', ['bezpečnosť','bezpečnostné','safety','kritické','ochrana'], 'AI pripraví otázky a dôkazy. Zodpovedná kvalifikovaná osoba musí posúdiť a schváliť zapojenie.', 'gpt-6-astra', { humanRequired: true })
 ];
 export function initialState() {
-  return structuredClone({ version: 2, profile: { name: 'Martin', role: 'Junior AI technik', context: 'Pracujem s elektrickými schémami, PDF manuálmi, QA a Harness Engineeringom. Chcem presné odkazy na zdroje, vysvetlenie neistôt a opakovateľné postupy.' }, situations: SITUATIONS, models: MODELS, notes: [], skills: [], history: [], settings: { priority: 'balanced', apiBase: '', apiModel: 'gpt-6.1-sol', apiEffort: 'medium', includeNotes: true } });
+  return structuredClone({ version: 2, profile: { name: 'Martin', role: '', context: 'Pracujem s elektrickými schémami, PDF manuálmi, QA a Harness Engineeringom. Chcem presné odkazy na zdroje, vysvetlenie neistôt a opakovateľné postupy.' }, situations: SITUATIONS, models: MODELS, notes: [], skills: [], history: [], settings: { priority: 'balanced', apiBase: '', apiModel: 'gpt-6.1-sol', apiEffort: 'medium', includeNotes: true } });
 }
